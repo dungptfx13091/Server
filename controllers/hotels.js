@@ -1,11 +1,10 @@
-const { ObjectID } = require("bson");
 const Hotel = require("../models/hotel");
 const Room = require("../models/room");
 const Transaction = require("../models/transaction");
 
 exports.list = async function (req, res, next) {
   //output: return list all hotels
-  const hotelList = await Hotel.find();
+  const hotelList = await Hotel.find().lean();
   res.json(hotelList);
 };
 
@@ -16,6 +15,7 @@ exports.add = async (req, res, next) => {
     city,
     address,
     distance,
+    cheapestPrice,
     photos,
     desc,
     rating,
@@ -31,6 +31,7 @@ exports.add = async (req, res, next) => {
       city,
       address,
       distance,
+      cheapestPrice,
       photos,
       desc,
       rating,
@@ -44,18 +45,35 @@ exports.add = async (req, res, next) => {
 };
 
 exports.delete = async (req, res, next) => {
-  try {
-    Hotel.findByIdAndDelete({ _id: req.query.id })
-      .exec()
-      .then((doc) => {
-        if (!doc) {
-          return res.status(400).end();
-        }
-        return res.status(200).end();
-      });
-  } catch (err) {
-    res.send({ status: "err" });
-  }
+  const hotelList = await Hotel.find().lean();
+  const transactions = await Transaction.find({ hotel: req.query.id }).lean();
+
+  if (transactions[0]) {
+    res.json({ canDelete: false });
+  } else
+    try {
+      console.log("candelete");
+      Hotel.findByIdAndDelete({ _id: req.query.id })
+        .exec()
+        .then((doc) => {
+          if (!doc) {
+            return res
+              .status(400)
+              .json({ canDelete: true, isDeleted: false, hotels: hotelList });
+          } else {
+            console.log(doc);
+            hotelList.splice(
+              hotelList.findIndex((x) => x.name === doc.name),
+              1
+            );
+            return res
+              .status(200)
+              .json({ canDelete: true, isDeleted: true, hotels: hotelList });
+          }
+        });
+    } catch (err) {
+      res.send({ status: "err" });
+    }
 };
 
 exports.detail = async function (req, res, next) {
@@ -71,18 +89,19 @@ exports.detail = async function (req, res, next) {
 exports.search = async function (req, res, next) {
   //input from req.query: {city, startDate, endDate, roomRequired}
   // output: list hotel
-  const hotels = await Hotel.find({ city: req.query.city });
-  const rooms = await Room.find();
-  const transactions = await Transaction.find();
+  const hotels = await Hotel.find({ city: req.query.city }).lean();
+  const rooms = await Room.find().lean();
+  const transactions = await Transaction.find().lean();
   //Count total rooms of a hotel
   const totalRoom = (id) => {
     let count = 0;
     for (let i = 0; i < hotels[id].rooms.length; i++) {
       const roomNum = rooms
-        .filter((room) => room.id == hotels[id].rooms[i])
+        .filter((room) => room._id == String(hotels[id].rooms[i]))
         .map((room) => room.roomNumbers)[0];
-      count += roomNum.length;
+      count += roomNum?.length;
     }
+
     return count;
   };
 
@@ -108,7 +127,7 @@ exports.search = async function (req, res, next) {
   const result = [];
 
   for (let i = 0; i < hotels.length; i++) {
-    if (totalRoom(i) - bookingRoom(i) >= req.query.roomRequired) {
+    if (hotels && totalRoom(i) - bookingRoom(i) >= req.query.roomRequired) {
       result.push(hotels[i]);
     }
   }
@@ -118,17 +137,21 @@ exports.search = async function (req, res, next) {
 exports.homePage = async function (req, res, next) {
   //output: return list of hotels group by city, by type and 3 hotel top rating
 
-  const cityHN = await Hotel.find({ city: "Ha Noi" });
-  const cityHCM = await Hotel.find({ city: "Ho Chi Minh" });
-  const cityDN = await Hotel.find({ city: "Da Nang" });
+  const cityHN = await Hotel.find({ city: "Ha Noi" }).lean();
+  const cityHCM = await Hotel.find({ city: "Ho Chi Minh" }).lean();
+  const cityDN = await Hotel.find({ city: "Da Nang" }).lean();
 
-  const typeHotel = await Hotel.find({ type: "hotel" });
-  const typeApartment = await Hotel.find({ type: "apartment" });
-  const typeResort = await Hotel.find({ type: "resort" });
-  const typeVilla = await Hotel.find({ type: "villa" });
-  const typeCabin = await Hotel.find({ type: "cabin" });
+  const typeHotel = await Hotel.find({ type: "hotel" }).lean();
+  const typeApartment = await Hotel.find({ type: "apartment" }).lean();
+  const typeResort = await Hotel.find({ type: "resort" }).lean();
+  const typeVilla = await Hotel.find({ type: "villa" }).lean();
+  const typeCabin = await Hotel.find({ type: "cabin" }).lean();
 
-  const topHotel = await Hotel.find().sort({ rating: -1 }).limit(3).exec();
+  const topHotel = await Hotel.find()
+    .lean()
+    .sort({ rating: -1 })
+    .limit(3)
+    .exec();
   res.json({
     city: { hn: cityHN, hcm: cityHCM, dn: cityDN },
     type: {

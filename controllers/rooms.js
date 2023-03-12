@@ -4,7 +4,7 @@ const Transaction = require("../models/transaction");
 
 exports.list = async function (req, res, next) {
   //output: return list all rooms
-  const roomLists = await Room.find();
+  const roomLists = await Room.find().lean();
   res.json(roomLists);
 };
 
@@ -21,25 +21,38 @@ exports.add = async (req, res, next) => {
 };
 
 exports.delete = async (req, res, next) => {
-  try {
-    Room.findByIdAndDelete({ _id: req.query.id })
-      .exec()
-      .then((doc) => {
-        if (!doc) {
-          return res.status(400).end();
-        }
-        return res.status(200).end();
-      });
-  } catch (err) {
-    res.send({ status: "err" });
-  }
+  const roomLists = await Room.find().lean();
+  const transactions = await Transaction.findOne({
+    hotel: req.query.id,
+  }).lean();
+
+  if (transactions) {
+    res.json({ canDelete: false });
+  } else
+    try {
+      Room.findByIdAndDelete({ _id: req.query.id })
+        .exec()
+        .then((doc) => {
+          if (!doc) {
+            return res.status(400).json({ isDeleted: false, rooms: roomLists });
+          } else {
+            roomLists.splice(
+              roomLists.findIndex((x) => x.title === doc.title),
+              1
+            );
+            return res.status(200).json({ isDeleted: true, rooms: roomLists });
+          }
+        });
+    } catch (err) {
+      res.send({ status: "err" });
+    }
 };
 
 exports.search = async function (req, res, next) {
   //input from req.query: {hotel_id, startDate, endDate }
   //output :list rooms of hotel (find by id) that not booking
-  const hotel = await Hotel.findOne({ _id: req.query.id });
-  const totalRooms = await Room.find();
+  const hotel = await Hotel.findOne({ _id: req.query.id }).lean();
+  const totalRooms = await Room.find().lean();
 
   const rooms = [];
   for (let i = 0; i < hotel.rooms.length; i++) {
@@ -50,7 +63,7 @@ exports.search = async function (req, res, next) {
     }
   }
 
-  const transactions = await Transaction.find({ hotel: req.query.id });
+  const transactions = await Transaction.find({ hotel: req.query.id }).lean();
   const roomFilter = (roomNum) => {
     for (let i = 0; i < transactions.length; i++) {
       if (

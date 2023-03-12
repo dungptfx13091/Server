@@ -7,7 +7,9 @@ exports.register = async (req, res, next) => {
     req.body;
   const encryptedPassword = await bcrypt.hash(password, 10);
   try {
-    const oldUser = await User.findOne({ email: email });
+    const oldUser = await User.findOne({
+      $or: [{ email: email }, { userName: userName }],
+    });
     if (oldUser) {
       res.json({
         oldUser: true,

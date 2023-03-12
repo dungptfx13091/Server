@@ -33,13 +33,16 @@ const hotelSchema = new Schema({
     type: String,
     required: true,
   },
+  cheapestPrice: {
+    type: Number,
+    required: false,
+  },
   rating: {
     type: Number,
     required: true,
   },
   featured: {
     type: String,
-    required: true,
   },
   rooms: [
     {
@@ -53,3 +56,7 @@ hotelSchema.methods.totalRooms = module.exports = mongoose.model(
   "Hotel",
   hotelSchema
 );
+
+// "rooms":["6311b3944a642f01423490df
+// ", "6311c0a8f2fce6ea18172fc3
+// "]
