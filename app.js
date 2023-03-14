@@ -63,6 +63,8 @@ app.get("/admin/auth", auth, (req, res) => {
   res.json({ authentication: true });
 });
 
+app.get("/admin/dashboard", auth, adminController.dashboard);
+
 app.get("/admin/users/list", auth, adminController.list);
 
 app.get("/admin/hotels/list", auth, hotelsController.list);
